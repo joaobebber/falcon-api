@@ -1,7 +1,9 @@
 import mimetypes
 
-from falcon import MEDIA_MSGPACK, HTTP_200, HTTP_201
+from falcon import before, HTTPNotFound, MEDIA_MSGPACK, HTTP_200, HTTP_201
 from msgpack import packb
+
+from src.middlewares.validate_image_type import validate_image_type
 
 class ImagesController:
   def __init__(self, image_store):
@@ -16,6 +18,7 @@ class ImagesController:
     resp.content_type = MEDIA_MSGPACK
     resp.data = packb(doc, use_bin_type=True)
 
+  @before(validate_image_type)
   def on_post(self, req, resp):
     name = self._image_store.save(req.stream, req.content_type)
 
@@ -28,4 +31,8 @@ class ItemController:
 
   def on_get(self, _req, resp, name):
     resp.content_type = mimetypes.guess_type(name)[0]
-    resp.stream, resp.content_length = self._image_store.open(name)
+
+    try:
+      resp.stream, resp.content_length = self._image_store.open(name)
+    except IOError as exc:
+      raise HTTPNotFound() from exc
